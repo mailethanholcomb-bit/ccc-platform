@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { Prisma } from "@prisma/client";
+import type { Deal, DealAnalyzerResult, ProtocolResult, BenchmarkResult, MasterSummary } from "@prisma/client";
 import {
   errorResponse,
   unauthorizedError,
@@ -533,11 +533,9 @@ function styleHeader(ws: ExcelJS.Worksheet) {
 // Type for deal with included relations
 // ---------------------------------------------------------------------------
 
-type DealWithRelations = Prisma.DealGetPayload<{
-  include: {
-    dealAnalyzerResult: true;
-    protocolResult: true;
-    benchmarkResult: true;
-    masterSummary: true;
-  };
-}>;
+type DealWithRelations = Deal & {
+  dealAnalyzerResult: DealAnalyzerResult | null;
+  protocolResult: ProtocolResult | null;
+  benchmarkResult: BenchmarkResult | null;
+  masterSummary: MasterSummary | null;
+};
