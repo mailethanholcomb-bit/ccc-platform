@@ -1,0 +1,444 @@
+// CCC Unified Deal Analysis Platform - Prisma Schema
+// PostgreSQL database with uuid-ossp extension
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  extensions = [uuidOssp(map: "uuid-ossp")]
+}
+
+// ─────────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────────
+
+enum UserRole {
+  admin
+  member
+
+  @@map("user_role")
+}
+
+enum UserStatus {
+  active
+  locked
+  pending
+
+  @@map("user_status")
+}
+
+enum DealPhase {
+  phase_1
+  phase_2
+  complete
+
+  @@map("deal_phase")
+}
+
+enum AnalysisStatus {
+  pending
+  queued
+  running_analyzer
+  running_protocol
+  running_benchmark
+  generating_summary
+  complete
+  error
+
+  @@map("analysis_status")
+}
+
+enum Verdict {
+  go
+  no_go
+  conditional
+
+  @@map("verdict")
+}
+
+enum EmailType {
+  option_a
+  option_b
+
+  @@map("email_type")
+}
+
+enum EmailStatus {
+  draft
+  sent
+  failed
+
+  @@map("email_status")
+}
+
+// ─────────────────────────────────────────────
+// Models
+// ─────────────────────────────────────────────
+
+model User {
+  id           String     @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  email        String     @unique @map("email")
+  passwordHash String     @map("password_hash")
+  role         UserRole   @default(member) @map("role")
+  status       UserStatus @default(pending) @map("status")
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime   @updatedAt @map("updated_at") @db.Timestamptz
+  lastLoginAt  DateTime?  @map("last_login_at") @db.Timestamptz
+  invitedById  String?    @map("invited_by_id") @db.Uuid
+
+  // Self-relation: who invited this user
+  invitedBy    User?  @relation("UserInvites", fields: [invitedById], references: [id])
+  invitedUsers User[] @relation("UserInvites")
+
+  // Reverse relations
+  memberProfile   MemberProfile?
+  deals           Deal[]
+  emailsGenerated EmailGenerated[]
+  activityLogs    ActivityLog[]
+
+  @@index([email])
+  @@index([status])
+  @@index([invitedById])
+  @@map("users")
+}
+
+model MemberProfile {
+  id                      String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId                  String   @unique @map("user_id") @db.Uuid
+  fullName                String   @map("full_name")
+  companyName             String?  @map("company_name")
+  title                   String?  @map("title")
+  phone                   String?  @map("phone")
+  mailingAddress          String?  @map("mailing_address")
+  signatureBlock          String?  @map("signature_block")
+  profilePhotoUrl         String?  @map("profile_photo_url")
+  targetIndustries        String[] @map("target_industries")
+  minAnnualRevenue        Decimal  @default(1000000) @map("min_annual_revenue") @db.Decimal
+  minSde                  Decimal  @default(200000) @map("min_sde") @db.Decimal
+  dscrFloor               Decimal  @default(1.75) @map("dscr_floor") @db.Decimal
+  targetGeographies       String[] @map("target_geographies")
+  dealSizeMin             Decimal? @map("deal_size_min") @db.Decimal
+  dealSizeMax             Decimal? @map("deal_size_max") @db.Decimal
+  preferredDealStructures String[] @map("preferred_deal_structures")
+  maxMultiple             Decimal  @default(4.0) @map("max_multiple") @db.Decimal
+  minYearsInBusiness      Int      @default(5) @map("min_years_in_business")
+  minEmployeeCount        Int      @default(3) @map("min_employee_count")
+  createdAt               DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt               DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("member_profiles")
+}
+
+model Deal {
+  id             String         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId         String         @map("user_id") @db.Uuid
+  phase          DealPhase      @default(phase_1) @map("phase")
+  analysisStatus AnalysisStatus @default(pending) @map("analysis_status")
+  verdict        Verdict?       @map("verdict")
+
+  // Listing info
+  listingUrl         String? @map("listing_url")
+  listingPlatform    String? @map("listing_platform")
+  listingTitle       String? @map("listing_title")
+  listingDescription String? @map("listing_description") @db.Text
+
+  // Business info
+  businessName    String? @map("business_name")
+  businessAddress String? @map("business_address")
+  city            String? @map("city")
+  state           String? @map("state")
+  industry        String? @map("industry")
+  naicsCode       String? @map("naics_code")
+  websiteUrl      String? @map("website_url")
+
+  // Broker info
+  brokerName    String? @map("broker_name")
+  brokerCompany String? @map("broker_company")
+  brokerEmail   String? @map("broker_email")
+  brokerPhone   String? @map("broker_phone")
+
+  // Financial info
+  askingPrice        Decimal? @map("asking_price") @db.Decimal
+  realEstateValue    Decimal  @default(0) @map("real_estate_value") @db.Decimal
+  standaloneBusPrice Decimal? @map("standalone_bus_price") @db.Decimal
+  revenueYear1       Decimal? @map("revenue_year_1") @db.Decimal
+  revenueYear2       Decimal? @map("revenue_year_2") @db.Decimal
+  revenueYear3       Decimal? @map("revenue_year_3") @db.Decimal
+  cogsYear1          Decimal? @map("cogs_year_1") @db.Decimal
+  cogsYear2          Decimal? @map("cogs_year_2") @db.Decimal
+  cogsYear3          Decimal? @map("cogs_year_3") @db.Decimal
+  sdeYear1           Decimal? @map("sde_year_1") @db.Decimal
+  sdeYear2           Decimal? @map("sde_year_2") @db.Decimal
+  sdeYear3           Decimal? @map("sde_year_3") @db.Decimal
+  ownerSalary        Decimal? @map("owner_salary") @db.Decimal
+  operatingExpenses  Decimal? @map("operating_expenses") @db.Decimal
+
+  // Operational info
+  yearsInBusiness             Int?     @map("years_in_business")
+  employeesW2                 Int?     @map("employees_w2")
+  employees1099               Int?     @map("employees_1099")
+  ownerHoursPerWeek           Int?     @map("owner_hours_per_week")
+  customerConcentrationTopPct Decimal? @map("customer_concentration_top_pct") @db.Decimal
+  recurringRevenuePct         Decimal? @map("recurring_revenue_pct") @db.Decimal
+  reasonForSelling            String?  @map("reason_for_selling") @db.Text
+
+  // Real estate
+  realEstateIncluded       Boolean  @default(false) @map("real_estate_included")
+  monthlyRent              Decimal? @map("monthly_rent") @db.Decimal
+  leaseTermRemainingMonths Int?     @map("lease_term_remaining_months")
+  leaseRenewalOptions      String?  @map("lease_renewal_options")
+
+  // Balance sheet
+  accountsReceivable Decimal? @map("accounts_receivable") @db.Decimal
+  accountsPayable    Decimal? @map("accounts_payable") @db.Decimal
+  inventoryValue     Decimal? @map("inventory_value") @db.Decimal
+  equipmentFfeValue  Decimal? @map("equipment_ffe_value") @db.Decimal
+
+  // Additional
+  memberNotes      String?   @map("member_notes") @db.Text
+  buyboxFlags      Json      @default("[]") @map("buybox_flags")
+  cimReceivedAt    DateTime? @map("cim_received_at") @db.Timestamptz
+  responseDeadline DateTime? @map("response_deadline") @db.Timestamptz
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dealAnalyzerResult DealAnalyzerResult?
+  protocolResult     ProtocolResult?
+  benchmarkResult    BenchmarkResult?
+  masterSummary      MasterSummary?
+  emailsGenerated    EmailGenerated[]
+  activityLogs       ActivityLog[]
+
+  @@index([userId])
+  @@index([phase])
+  @@index([analysisStatus])
+  @@index([verdict])
+  @@index([industry])
+  @@index([state])
+  @@index([createdAt])
+  @@index([userId, createdAt])
+  @@map("deals")
+}
+
+model DealAnalyzerResult {
+  id     String @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  dealId String @unique @map("deal_id") @db.Uuid
+
+  // Multiples
+  askingMultiple     Decimal? @map("asking_multiple") @db.Decimal
+  standaloneMultiple Decimal? @map("standalone_multiple") @db.Decimal
+
+  // Margins
+  grossMarginYear1 Decimal? @map("gross_margin_year_1") @db.Decimal
+  grossMarginYear2 Decimal? @map("gross_margin_year_2") @db.Decimal
+  grossMarginYear3 Decimal? @map("gross_margin_year_3") @db.Decimal
+  sdeMarginYear1   Decimal? @map("sde_margin_year_1") @db.Decimal
+  sdeMarginYear2   Decimal? @map("sde_margin_year_2") @db.Decimal
+  sdeMarginYear3   Decimal? @map("sde_margin_year_3") @db.Decimal
+
+  // Growth
+  revenueGrowthYoy1 Decimal? @map("revenue_growth_yoy_1") @db.Decimal
+  revenueGrowthYoy2 Decimal? @map("revenue_growth_yoy_2") @db.Decimal
+  sdeGrowthYoy1     Decimal? @map("sde_growth_yoy_1") @db.Decimal
+  sdeGrowthYoy2     Decimal? @map("sde_growth_yoy_2") @db.Decimal
+
+  // DSCR scenarios
+  dscrScenario1       Decimal? @map("dscr_scenario_1") @db.Decimal
+  dscrScenario2       Decimal? @map("dscr_scenario_2") @db.Decimal
+  annualDebtServiceS1 Decimal? @map("annual_debt_service_s1") @db.Decimal
+  annualDebtServiceS2 Decimal? @map("annual_debt_service_s2") @db.Decimal
+
+  // Working capital & grading
+  workingCapitalFromSpread Decimal? @map("working_capital_from_spread") @db.Decimal
+  dealGrade                String?  @map("deal_grade")
+  gradeExplanation         String?  @map("grade_explanation") @db.Text
+
+  // JSON analysis blobs
+  projections          Json?    @map("projections")
+  exitValue            Decimal? @map("exit_value") @db.Decimal
+  irr                  Decimal? @map("irr") @db.Decimal
+  dealStack            Json?    @map("deal_stack")
+  creativeFinancing    Json?    @map("creative_financing")
+  strategyLadder       Json?    @map("strategy_ladder")
+  reScenarioBuyAll     Json?    @map("re_scenario_buy_all")
+  reScenarioLease      Json?    @map("re_scenario_lease")
+  reScenarioSellerNote Json?    @map("re_scenario_seller_note")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@index([dealId])
+  @@map("deal_analyzer_results")
+}
+
+model ProtocolResult {
+  id     String @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  dealId String @unique @map("deal_id") @db.Uuid
+
+  // Phase 1 - Industry research
+  phase1Complete       Boolean @default(false) @map("phase_1_complete")
+  industryOverview     String? @map("industry_overview") @db.Text
+  marketSize           String? @map("market_size") @db.Text
+  growthTrends         String? @map("growth_trends") @db.Text
+  competitiveLandscape String? @map("competitive_landscape") @db.Text
+  seasonalPatterns     String? @map("seasonal_patterns") @db.Text
+  industryRisks        String? @map("industry_risks") @db.Text
+
+  // Phase 2 - Digital footprint
+  phase2Complete        Boolean @default(false) @map("phase_2_complete")
+  websiteAudit          Json?   @map("website_audit")
+  googleReviews         Json?   @map("google_reviews")
+  socialMedia           Json?   @map("social_media")
+  digitalFootprintScore Int?    @map("digital_footprint_score")
+
+  // Phase 3 - Owner & operational signals
+  phase3Complete            Boolean @default(false) @map("phase_3_complete")
+  distressSignals           Json?   @map("distress_signals")
+  successionIndicators      Json?   @map("succession_indicators")
+  operationalFatigueMarkers Json?   @map("operational_fatigue_markers")
+  financialStressSignals    Json?   @map("financial_stress_signals")
+  ownerMotivationAnalysis   String? @map("owner_motivation_analysis") @db.Text
+
+  // Phase 4 - Scorecard & verdict
+  phase4Complete     Boolean @default(false) @map("phase_4_complete")
+  scorecard          Json?   @map("scorecard")
+  protocolVerdict    String? @map("protocol_verdict")
+  protocolAssessment String? @map("protocol_assessment") @db.Text
+  caseStudyNarrative String? @map("case_study_narrative") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@index([dealId])
+  @@map("protocol_results")
+}
+
+model BenchmarkResult {
+  id     String @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  dealId String @unique @map("deal_id") @db.Uuid
+
+  screening          Json? @map("screening")
+  industryBenchmarks Json? @map("industry_benchmarks")
+  dealVsBenchmark    Json? @map("deal_vs_benchmark")
+  dscrScenarios      Json? @map("dscr_scenarios")
+  sensitivity        Json? @map("sensitivity")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@index([dealId])
+  @@map("benchmark_results")
+}
+
+model MasterSummary {
+  id     String @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  dealId String @unique @map("deal_id") @db.Uuid
+
+  verdict               String? @map("verdict")
+  verdictReasoning      String? @map("verdict_reasoning") @db.Text
+  dealSnapshot          Json?   @map("deal_snapshot")
+  financialHealth       Json?   @map("financial_health")
+  marketPosition        Json?   @map("market_position")
+  businessIntelligence  Json?   @map("business_intelligence")
+  redFlags              Json?   @map("red_flags")
+  greenFlags            Json?   @map("green_flags")
+  buyboxAlignment       Json?   @map("buybox_alignment")
+  sensitivityHighlights Json?   @map("sensitivity_highlights")
+  recommendedNextSteps  String? @map("recommended_next_steps") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@index([dealId])
+  @@map("master_summaries")
+}
+
+model EmailGenerated {
+  id               String      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  dealId           String      @map("deal_id") @db.Uuid
+  userId           String      @map("user_id") @db.Uuid
+  emailType        EmailType   @map("email_type")
+  subject          String      @map("subject")
+  body             String      @map("body") @db.Text
+  brokerName       String?     @map("broker_name")
+  businessName     String?     @map("business_name")
+  redFlagsIncluded Json?       @map("red_flags_included")
+  status           EmailStatus @default(draft) @map("status")
+  sentAt           DateTime?   @map("sent_at") @db.Timestamptz
+  sentToEmail      String?     @map("sent_to_email")
+  createdAt        DateTime    @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([dealId])
+  @@index([userId])
+  @@index([status])
+  @@index([dealId, emailType])
+  @@map("emails_generated")
+}
+
+model ActivityLog {
+  id         String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  dealId     String?  @map("deal_id") @db.Uuid
+  actionType String   @map("action_type")
+  details    Json?    @map("details")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deal Deal? @relation(fields: [dealId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([dealId])
+  @@index([actionType])
+  @@index([createdAt])
+  @@index([userId, createdAt])
+  @@map("activity_logs")
+}
+
+model IndustryBenchmark {
+  id                       String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  industry                 String   @map("industry")
+  naicsCode                String?  @map("naics_code")
+  avgGrossMargin           Decimal? @map("avg_gross_margin") @db.Decimal
+  avgNetMargin             Decimal? @map("avg_net_margin") @db.Decimal
+  avgSdeMargin             Decimal? @map("avg_sde_margin") @db.Decimal
+  avgRevenuePerEmployee    Decimal? @map("avg_revenue_per_employee") @db.Decimal
+  avgMultiple              Decimal? @map("avg_multiple") @db.Decimal
+  multipleRangeLow         Decimal? @map("multiple_range_low") @db.Decimal
+  multipleRangeHigh        Decimal? @map("multiple_range_high") @db.Decimal
+  avgGrowthRate            Decimal? @map("avg_growth_rate") @db.Decimal
+  avgCustomerConcentration Decimal? @map("avg_customer_concentration") @db.Decimal
+  avgRecurringRevenuePct   Decimal? @map("avg_recurring_revenue_pct") @db.Decimal
+  source                   String?  @map("source")
+  lastUpdated              DateTime @default(now()) @map("last_updated") @db.Timestamptz
+
+  @@index([industry])
+  @@index([naicsCode])
+  @@index([industry, naicsCode])
+  @@map("industry_benchmarks")
+}
