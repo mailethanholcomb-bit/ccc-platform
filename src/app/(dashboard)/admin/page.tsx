@@ -11,16 +11,16 @@ interface Member {
   status: string;
   createdAt: string;
   lastLoginAt: string | null;
-  profile: { fullName: string; companyName: string | null } | null;
+  memberProfile: { fullName: string; companyName: string | null } | null;
   _count: { deals: number };
+  dealCount: number;
 }
 
 interface Analytics {
-  totalDeals: number;
-  totalMembers: number;
-  verdictBreakdown: { go: number; no_go: number; conditional: number; pending: number };
-  avgDscr: number | null;
-  industryBreakdown: Record<string, number>;
+  overview: { totalDeals: number; totalMembers: number };
+  financials: { avgDscr: number | null; passRate: number | null };
+  verdictBreakdown: Record<string, number>;
+  industryBreakdown: { industry: string; count: number }[];
 }
 
 interface Activity {
@@ -57,7 +57,7 @@ export default function AdminDashboardPage() {
           analyticsRes.json(),
           activityRes.json(),
         ]);
-        if (membersData.success) setMembers(membersData.data || []);
+        if (membersData.success) setMembers(membersData.data?.members || []);
         if (analyticsData.success) setAnalytics(analyticsData.data);
         if (activityData.success) setActivity(activityData.data?.activities || []);
       } catch {
@@ -113,24 +113,24 @@ export default function AdminDashboardPage() {
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <div className="bg-white rounded-xl p-5 shadow-sm border">
             <div className="text-sm text-gray-500">Members</div>
-            <div className="text-2xl font-bold mt-1">{analytics.totalMembers}</div>
+            <div className="text-2xl font-bold mt-1">{analytics.overview.totalMembers}</div>
           </div>
           <div className="bg-white rounded-xl p-5 shadow-sm border">
             <div className="text-sm text-gray-500">Total Deals</div>
-            <div className="text-2xl font-bold mt-1">{analytics.totalDeals}</div>
+            <div className="text-2xl font-bold mt-1">{analytics.overview.totalDeals}</div>
           </div>
           <div className="bg-white rounded-xl p-5 shadow-sm border">
             <div className="text-sm text-gray-500">GO Deals</div>
-            <div className="text-2xl font-bold mt-1 text-green-600">{analytics.verdictBreakdown.go}</div>
+            <div className="text-2xl font-bold mt-1 text-green-600">{analytics.verdictBreakdown.go ?? 0}</div>
           </div>
           <div className="bg-white rounded-xl p-5 shadow-sm border">
             <div className="text-sm text-gray-500">NO-GO Deals</div>
-            <div className="text-2xl font-bold mt-1 text-red-600">{analytics.verdictBreakdown.no_go}</div>
+            <div className="text-2xl font-bold mt-1 text-red-600">{analytics.verdictBreakdown.no_go ?? 0}</div>
           </div>
           <div className="bg-white rounded-xl p-5 shadow-sm border">
             <div className="text-sm text-gray-500">Avg DSCR</div>
             <div className="text-2xl font-bold mt-1">
-              {analytics.avgDscr ? `${analytics.avgDscr.toFixed(2)}x` : "N/A"}
+              {analytics.financials.avgDscr ? `${analytics.financials.avgDscr.toFixed(2)}x` : "N/A"}
             </div>
           </div>
         </div>
@@ -160,7 +160,7 @@ export default function AdminDashboardPage() {
                 {members.slice(0, 10).map((m) => (
                   <tr key={m.id} className="border-b border-gray-50">
                     <td className="py-2 px-4 font-medium">
-                      {m.profile?.fullName || "No profile"}
+                      {m.memberProfile?.fullName || "No profile"}
                     </td>
                     <td className="py-2 px-4 text-gray-600">{m.email}</td>
                     <td className="py-2 px-4 text-center">{m._count.deals}</td>
@@ -237,13 +237,11 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* Industry Breakdown */}
-      {analytics && Object.keys(analytics.industryBreakdown).length > 0 && (
+      {analytics && analytics.industryBreakdown.length > 0 && (
         <div className="bg-white rounded-xl p-6 shadow-sm border">
           <h2 className="text-lg font-semibold mb-4">Industry Breakdown</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {Object.entries(analytics.industryBreakdown)
-              .sort(([, a], [, b]) => b - a)
-              .map(([industry, count]) => (
+            {analytics.industryBreakdown.map(({ industry, count }) => (
                 <div key={industry} className="bg-gray-50 rounded-lg p-3">
                   <div className="text-sm font-medium">{industry}</div>
                   <div className="text-lg font-bold text-blue-600">{count}</div>
