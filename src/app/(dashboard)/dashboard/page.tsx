@@ -48,7 +48,16 @@ export default function DashboardPage() {
         const profileData = await profileRes.json();
 
         if (dealsData.success) setDeals(dealsData.data?.deals || []);
-        if (profileData.success) setProfile(profileData.data);
+        if (profileData.success && profileData.data?.memberProfile) {
+          const mp = profileData.data.memberProfile;
+          setProfile({
+            fullName: mp.fullName ?? null,
+            targetIndustries: mp.targetIndustries ?? [],
+            minAnnualRevenue: Number(mp.minAnnualRevenue ?? 0),
+            minSde: Number(mp.minSde ?? 0),
+            dscrFloor: Number(mp.dscrFloor ?? 0),
+          });
+        }
       } catch {
         // Handle silently
       } finally {
