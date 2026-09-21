@@ -4,7 +4,24 @@ Drop nine files in this folder using the exact names below. The page works
 without them — each frame falls back to a navy/cyan duotone plate, so nothing
 renders as a broken image — but it is built to carry real photography.
 
-Pull these from the existing hyox.com site, or shoot new ones.
+## Where to get them
+
+Best to worst:
+
+1. **Shoot them at the clinic.** Phone cameras are fine in good window light.
+   Real staff and a real chamber beat any stock photo, and it is the only
+   option where a face can be captioned as an actual patient.
+2. **Free stock** — Unsplash or Pexels. Search terms that return usable results
+   for this set: "senior woman smiling portrait", "doctor patient smiling",
+   "medical clinic reception", "scuba diver smiling", "physical therapy
+   session", "hospital corridor modern". Filter to landscape/portrait to match
+   the crops below.
+3. **Paid stock** — Stocksy or Getty if you want something that does not look
+   like stock. Worth it for the hero image specifically.
+
+Whatever you use, the footer currently carries the line "Photography on this
+site is illustrative and does not depict actual patients." Keep that line
+unless every pictured person is a real patient with a signed release.
 
 | File                  | Crop  | Suggested size | What it should show |
 |-----------------------|-------|----------------|---------------------|
